@@ -8,7 +8,7 @@ import requests
 BASE_URL = "https://chrome-stats.com/api"
 
 # API 키 설정
-API_KEYS = "your keys"
+API_KEYS = "your api keys"
 api_key_index = 0
 
 HEADERS = {
@@ -67,11 +67,11 @@ def download_extension(extension_id, version, file_type, category):
     category_folder = os.path.join(BASE_DOWNLOAD_FOLDER, category)
     os.makedirs(category_folder, exist_ok=True)
     
-    # safe file name
+    # 안전한 파일 이름
     safe_version = sanitize_filename(version)
     file_path = os.path.join(category_folder, f"{extension_id}_{safe_version}.{file_type.lower()}")
 
-    # Skip if file already exists
+    # 파일이 존재한다면 skip
     if os.path.exists(file_path):
         print(f"File already exists: {file_path}, skipping download.")
         return
