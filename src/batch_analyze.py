@@ -1,7 +1,7 @@
 import os
 from analyze_extension import analyze_extension
 
-INPUT_FOLDER = "./samples"  # ZIP 파일이 있는 폴더
+INPUT_FOLDER = "/home/minhyuk/Desktop/Download_extension/other"  # ZIP 파일이 있는 폴더
 OUTPUT_CSV = "extension_analysis.csv"
 
 # 모든 ZIP 파일 분석 실행
