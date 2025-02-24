@@ -163,7 +163,7 @@ def batch_analyze(input_folder, output_csv):
 
 # **실행 예시**
 if __name__ == "__main__":
-    INPUT_FOLDER = "/Users/choohimchan/Downloads/Lab"  # ZIP 파일이 있는 폴더
+    INPUT_FOLDER = "/home/minhyuk/Desktop/Download_extension/Extensions/other"  # ZIP 파일이 있는 폴더
     OUTPUT_CSV = "extension_analysis.csv"
     
     batch_analyze(INPUT_FOLDER, OUTPUT_CSV)

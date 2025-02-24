@@ -9,6 +9,7 @@ void analyze_zip(const char *zip_path);
 void print_api_results();
 
 #define SAMPLE_SIZE 500
+#define MAX_PATH_LEN 512
 
 // API 카테고리별 목록 정의
 typedef struct {
@@ -101,7 +102,7 @@ int get_extension_list(char extensions[][256], const char *folder_path) {
     int count = 0;
     while ((entry = readdir(dir)) != NULL) {
         if (strstr(entry->d_name, ".zip")) {
-            snprintf(extensions[count], 256, "%s/%s", folder_path, entry->d_name);
+            snprintf(extensions[count], MAX_PATH_LEN, "%s/%s", folder_path, entry->d_name);
             count++;
             if (count >= 5000) break; // 너무 많아지면 제한함
         }
