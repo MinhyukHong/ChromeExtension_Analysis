@@ -1,9 +1,7 @@
-# !/bin/bash
+#!/bin/bash
 
-EXTENSIONS_DIR="/home/minhyuk/Desktop/Download_extension/Extensions"
-ANALYZER="/home/minhyuk/Desktop/ChromeExtension_Analysis/src/analyzer"
+EXTENSIONS_DIR="/Users/minhyuk/Desktop/csf/extension_samples"
+ANALYZER="/Users/minhyuk/Desktop/csf/ChromeExtension_Analysis/src/analyzer"
 
-find "$EXTENSIONS_DIR" -type f -name "*zip" | while IFS= read -r zip_file; do
-    echo "Analyzing: $zip_file"
-    "$ANALYZER" "$zip_file"
-done
+echo "Analyzing all extensions in: $EXTENSIONS_DIR"
+"$ANALYZER" "$EXTENSIONS_DIR"
