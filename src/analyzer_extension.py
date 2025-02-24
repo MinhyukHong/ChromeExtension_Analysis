@@ -1,11 +1,12 @@
+import csv
+import json
 import os
 import zipfile
-import json
-import csv
-import esprima
 from collections import defaultdict
 
-# **📌 API 카테고리별 목록**
+import esprima
+
+# API 카테고리별 목록
 API_CATEGORIES = {
     "File System": [
         "document.querySelector('input[type=\"file\"]')", "file.name", "file.type", "file.size",
@@ -38,18 +39,18 @@ API_CATEGORIES = {
     ]
 }
 
-# **📌 API 이름 → 카테고리 매핑**
+# API 이름 → 카테고리 매핑
 API_TO_CATEGORY = {api: category for category, apis in API_CATEGORIES.items() for api in apis}
 
-# **📌 변수 추적을 위한 딕셔너리**
+# 변수 추적을 위한 딕셔너리
 variable_map = {}
 
-# **📌 ZIP 압축 해제**
+# ZIP 압축 해제
 def extract_zip(zip_path, extract_to):
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         zip_ref.extractall(extract_to)
 
-# **📌 AST에서 변수 추적**
+# AST에서 변수 추적
 def track_variables(node):
     """ 변수 선언 및 할당 추적 (API가 변수에 저장되는 경우) """
     if node.type == "VariableDeclaration":
@@ -60,7 +61,7 @@ def track_variables(node):
                 if assigned_func and assigned_func in API_TO_CATEGORY:
                     variable_map[var_name] = assigned_func  # 변수 → API 매핑
 
-# **📌 AST에서 함수명 추출**
+# AST에서 함수명 추출
 def extract_function_name(expr):
     """ 함수명 추출 (document.createElement 등 감지) """
     if expr.type == "Identifier":  # fetch(), setTimeout() 같은 단일 함수
@@ -72,7 +73,7 @@ def extract_function_name(expr):
             return f"{obj}.{prop}"
     return None
 
-# **📌 AST 트리 전체 탐색하여 API 호출 감지**
+# AST 트리 전체 탐색하여 API 호출 감지
 def analyze_ast_recursively(node, api_counts):
     """ 재귀적으로 AST를 탐색하여 API 호출 감지 """
     if isinstance(node, list):
@@ -95,7 +96,7 @@ def analyze_ast_recursively(node, api_counts):
             if not attr.startswith("_"):  # 내부 속성 제외
                 analyze_ast_recursively(getattr(node, attr), api_counts)
 
-# **📌 JavaScript 파일 AST 분석**
+# JavaScript 파일 AST 분석
 def analyze_js_file(file_path):
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
@@ -107,18 +108,18 @@ def analyze_js_file(file_path):
 
     api_counts = defaultdict(lambda: defaultdict(int))
 
-    # **AST 트리 전체 탐색**
+    # AST 트리 전체 탐색
     analyze_ast_recursively(tree, api_counts)
 
     return api_counts
 
-# **📌 manifest.json 분석 (permissions 추출)**
+# manifest.json 분석 (permissions 추출)
 def analyze_manifest(manifest_path):
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
     return manifest.get("permissions", [])
 
-# **📌 ZIP 파일 분석**
+# ZIP 파일 분석
 def analyze_extension(zip_path, output_csv):
     extract_dir = zip_path.replace(".zip", "")
     extract_zip(zip_path, extract_dir)
@@ -150,7 +151,7 @@ def analyze_extension(zip_path, output_csv):
     print(f"API Counts: {json.dumps(api_counts, indent=2)}")
     print(f"Permissions: {permissions}")
 
-# **📌 여러 개의 ZIP 파일을 자동으로 분석**
+# 여러 개의 ZIP 파일을 자동으로 분석
 def batch_analyze(input_folder, output_csv):
     with open(output_csv, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -161,7 +162,7 @@ def batch_analyze(input_folder, output_csv):
             zip_path = os.path.join(input_folder, file)
             analyze_extension(zip_path, output_csv)
 
-# **실행 예시**
+# 실행
 if __name__ == "__main__":
     INPUT_FOLDER = "/home/minhyuk/Desktop/Download_extension/Extensions/other"  # ZIP 파일이 있는 폴더
     OUTPUT_CSV = "extension_analysis.csv"
