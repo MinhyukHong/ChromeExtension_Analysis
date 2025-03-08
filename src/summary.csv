@@ -1,0 +1,39 @@
+Category,API,Count
+File System,document.cookie,176
+File System,new Blob,62
+File System,localStorage.getItem,57
+File System,localStorage.setItem,45
+File System,sessionStorage.getItem,25
+File System,sessionStorage.setItem,10
+File System,file.name,6
+File System,window.requestFileSystem,5
+File System,indexedDB.open,2
+File System,store.put,1
+Network,fetch,2456
+Network,new XMLHttpRequest,63
+Network,navigator.sendBeacon,37
+Network,chrome.webRequest.onBeforeRequest.addListener,2
+Network,chrome.webRequest.onHeadersReceived.addListener,2
+Rendering,setTimeout,2059
+Rendering,setInterval,905
+Rendering,document.querySelector,450
+Rendering,document.createElement,402
+Rendering,window.open,207
+Rendering,document.getElementById,142
+Rendering,new MutationObserver,106
+Rendering,element.style,34
+Rendering,chrome.tabs.create,7
+Rendering,element.innerHTML,6
+Rendering,chrome.windows.create,6
+Rendering,chrome.tabs.executeScript,5
+Rendering,document.appendChild,2
+Rendering,canvas.getContext,2
+Rendering,chrome.notifications.create,1
+User Interaction,addEventListener,1393
+User Interaction,window.alert,19
+User Interaction,window.confirm,15
+User Interaction,window.onbeforeunload,14
+User Interaction,chrome.tabs.onActivated.addListener,2
+User Interaction,chrome.contextMenus.create,2
+User Interaction,chrome.notifications.onClicked.addListener,1
+User Interaction,chrome.permissions.request,1
