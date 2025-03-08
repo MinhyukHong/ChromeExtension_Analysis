@@ -1,0 +1,55 @@
+Category,API,Count
+Network,fetch,21041
+Network,new XMLHttpRequest,758
+Network,navigator.sendBeacon,257
+Network,new WebSocket,120
+Network,chrome.identity.getAuthToken,63
+Network,new RTCPeerConnection,35
+Network,chrome.webRequest.onBeforeRequest.addListener,8
+Network,chrome.webRequest.onHeadersReceived.addListener,2
+Network,chrome.dns.resolve,1
+Rendering,setTimeout,24133
+Rendering,document.createElement,16449
+Rendering,document.querySelector,12034
+Rendering,document.getElementById,8810
+Rendering,setInterval,2594
+Rendering,element.style,2058
+Rendering,new MutationObserver,1441
+Rendering,window.open,1291
+Rendering,chrome.tabs.create,699
+Rendering,element.innerHTML,364
+Rendering,chrome.notifications.create,118
+Rendering,chrome.windows.create,111
+Rendering,canvas.getContext,89
+Rendering,chrome.tabs.executeScript,11
+Rendering,document.designMode,9
+Rendering,document.appendChild,5
+User Interaction,addEventListener,28962
+User Interaction,chrome.contextMenus.create,120
+User Interaction,window.prompt,63
+User Interaction,chrome.alarms.create,56
+User Interaction,chrome.tabs.onActivated.addListener,43
+User Interaction,document.onmousemove,26
+User Interaction,chrome.notifications.onClicked.addListener,24
+User Interaction,window.onbeforeunload,22
+User Interaction,window.confirm,18
+User Interaction,chrome.permissions.request,17
+User Interaction,window.alert,17
+User Interaction,document.onkeydown,2
+File System,localStorage.getItem,1675
+File System,localStorage.setItem,1433
+File System,new Blob,1235
+File System,document.cookie,761
+File System,navigator.clipboard.writeText,263
+File System,indexedDB.open,239
+File System,file.name,192
+File System,sessionStorage.getItem,160
+File System,sessionStorage.setItem,130
+File System,file.size,122
+File System,file.type,75
+File System,store.put,40
+File System,navigator.clipboard.readText,28
+File System,file.lastModified,11
+File System,"document.querySelector('input[type=""file""]')",6
+File System,window.requestFileSystem,2
+File System,fileEntry.createWriter,1
