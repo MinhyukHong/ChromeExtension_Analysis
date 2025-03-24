@@ -6,7 +6,7 @@ import random
 import csv
 from collections import defaultdict
 
-# **📌 API 카테고리별 목록 정의**
+# 📌 API 카테고리별 목록 정의
 API_CATEGORIES = {
     "File System": [
         "document.querySelector('input[type=\"file\"]')", "file.name", "file.type", "file.size",
@@ -36,132 +36,157 @@ API_CATEGORIES = {
         "chrome.alarms.create", "chrome.notifications.onClicked.addListener",
         "chrome.permissions.request", "chrome.tabs.onActivated.addListener",
         "window.alert", "window.confirm", "window.prompt"
+    ],
+    "Storage": [
+        "chrome.storage.local.get", "chrome.storage.local.set",
+        "chrome.storage.sync.get", "chrome.storage.sync.set"
+    ],
+    "Device": [
+        "navigator.geolocation.getCurrentPosition", "navigator.geolocation.watchPosition",
+        "navigator.mediaDevices.getUserMedia", "navigator.mediaDevices.enumerateDevices"
+    ],
+    "Security": [
+        "chrome.permissions.request", "chrome.identity.getAuthToken",
+        "chrome.privacy.network.webRTCIPHandlingPolicy"
     ]
 }
 
+# API -> Category 매핑
 API_TO_CATEGORY = {api: category for category, apis in API_CATEGORIES.items() for api in apis}
-API_COUNTS = defaultdict(lambda: defaultdict(int))
-SAMPLE_RESULTS = []  # 샘플별 결과 저장
 
-# **📌 API 카운트 증가 (전역 API_COUNTS 업데이트)**
-def add_api_count(api_name):
-    category = API_TO_CATEGORY.get(api_name)
-    if category:
-        API_COUNTS[category][api_name] += 1
+# 권한별 필요한 API 매핑
+PERMISSION_TO_APIS = {
+    "bookmarks": ["chrome.bookmarks.*"],
+    "clipboardRead": ["navigator.clipboard.readText", "document.execCommand('paste')"],
+    "clipboardWrite": ["navigator.clipboard.writeText", "document.execCommand('copy')"],
+    "tabs": ["chrome.tabs.*"],
+    "cookies": ["chrome.cookies.*"],
+    "downloads": ["chrome.downloads.*"],
+    "history": ["chrome.history.*"],
+    "management": ["chrome.management.*"],
+    "webRequest": ["chrome.webRequest.*"],
+    "webRequestBlocking": ["chrome.webRequest.onBeforeRequest.addListener"],
+    "nativeMessaging": ["chrome.runtime.connectNative", "chrome.runtime.sendNativeMessage"],
+    "proxy": ["chrome.proxy.settings.*"],
+    "geolocation": ["navigator.geolocation.getCurrentPosition"],
+    "storage": ["chrome.storage.*"]
+}
 
-# **📌 API 검출 (전역 API_COUNTS 업데이트)**
+SAMPLE_RESULTS = []
+
+# 📌 API 검출
 def extract_apis(content):
+    found_apis = defaultdict(int)
     for api in API_TO_CATEGORY.keys():
         matches = re.findall(re.escape(api), content)
-        for _ in matches:
-            add_api_count(api)
+        if matches:
+            found_apis[api] += len(matches)
+    return found_apis
 
-# **📌 manifest.json에서 permissions 추출**
+# 📌 manifest.json에서 permissions 추출 및 API 매칭
 def extract_permissions(content):
     try:
         manifest = json.loads(content)
-        return manifest.get("permissions", [])
-    except json.JSONDecodeError:
-        return []
+        permissions = set(manifest.get("permissions", []))
+        matched_apis = set()
 
-# **📌 ZIP 파일 내 파일 검사**
+        for perm, apis in PERMISSION_TO_APIS.items():
+            if perm in permissions:
+                matched_apis.update(apis)
+
+        return list(permissions), list(matched_apis)
+    except json.JSONDecodeError:
+        return [], []
+
+# 📌 ZIP 파일 내 파일 검사
 def analyze_zip(zip_path):
     api_counts = defaultdict(lambda: defaultdict(int))
-    permissions = []
+    permissions, matched_apis = [], []
+    wasm_exist = "X"
+
     try:
         with zipfile.ZipFile(zip_path, 'r') as z:
             for name in z.namelist():
                 if name.startswith("__MACOSX/") or name.startswith("._"):
                     continue
-                if not (name.endswith(".js") or name.endswith(".json") or "manifest.json" in name):
+                if name.endswith(".wasm"):
+                    wasm_exist = "O"
+
+                if not (name.endswith(".js") or name.endswith(".json")):
                     continue
 
                 with z.open(name) as f:
                     content = f.read().decode("utf-8", errors="ignore")
                     if "manifest.json" in name:
-                        permissions = extract_permissions(content)
+                        permissions, matched_apis = extract_permissions(content)
                     else:
-                        for api in API_TO_CATEGORY:
-                            matches = re.findall(re.escape(api), content)
-                            for _ in matches:
-                                category = API_TO_CATEGORY[api]
-                                api_counts[category][api] += 1
-                                add_api_count(api)  # ✅ 전역 API_COUNTS 업데이트
-                print(f"Analyzing file: {name}")
+                        found_apis = extract_apis(content)
+                        for api, count in found_apis.items():
+                            category = API_TO_CATEGORY[api]
+                            api_counts[category][api] += count
+
     except zipfile.BadZipFile:
         print(f"Failed to open zip file: {zip_path}")
-    
+
+    # ✅ `unmatched_permissions` 수정
+    matched_permissions = {perm for perm, apis in PERMISSION_TO_APIS.items() if any(api in matched_apis for api in apis)}
+    unmatched_permissions = list(set(permissions) - matched_permissions)
+
     SAMPLE_RESULTS.append({
         "zip": os.path.basename(zip_path),
         "permissions": permissions,
+        "matched_apis": matched_apis,
+        "unmatched_permissions": unmatched_permissions,
+        "wasm_exist": wasm_exist,
         "api_counts": api_counts
     })
 
-# **📌 CSV 저장 (통합 통계 + 상세 분석)**
+# 📌 CSV 저장
 def save_to_csv():
-    # 통합 통계 저장
-    if API_COUNTS:  # ✅ 비어있지 않은 경우만 저장
-        with open("summary.csv", "w", newline="") as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(["Category", "API", "Count"])
-            for category, apis in API_COUNTS.items():
-                for api, count in sorted(apis.items(), key=lambda x: x[1], reverse=True):
-                    writer.writerow([category, api, count])
-        print("Saved summary to summary.csv")
-    else:
-        print("No API usage found, summary.csv not created.")
+    categories = list(API_CATEGORIES.keys())
 
-    # 샘플별 상세 분석 저장
+    with open("summary.csv", "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["Category", "API", "Count"])
+
+        total_counts = defaultdict(lambda: defaultdict(int))
+        for result in SAMPLE_RESULTS:
+            for category, apis in result["api_counts"].items():
+                for api, count in apis.items():
+                    total_counts[category][api] += count
+
+        for category, apis in total_counts.items():
+            for api, count in sorted(apis.items(), key=lambda x: x[1], reverse=True):
+                writer.writerow([category, api, count])
+
     with open("detailed_analysis.csv", "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["ZIP File", "Permissions", "File System", "Network", "Rendering", "User Interaction"])
+        writer.writerow(["ZIP File", "Permissions", "Matched APIs", "Unmatched Permissions", "WASM Exist"] + categories)
+
         for result in SAMPLE_RESULTS:
             row = [
                 result["zip"],
-                json.dumps(result["permissions"])
+                json.dumps(result["permissions"]),
+                json.dumps(result["matched_apis"]),
+                json.dumps(result["unmatched_permissions"]),
+                result["wasm_exist"]
             ]
-            for category in ["File System", "Network", "Rendering", "User Interaction"]:
+            for category in categories:
                 sorted_counts = sorted(result["api_counts"][category].items(), key=lambda x: x[1], reverse=True)
                 row.append(json.dumps({api: count for api, count in sorted_counts}))
             writer.writerow(row)
-    print("Saved detailed analysis to detailed_analysis.csv")
 
-# **📌 API 분석 결과 출력 (카테고리별)**
-def print_api_results():
-    print("\n=== API Usage Summary ===")
-    for category, apis in API_COUNTS.items():
-        print(f"\n[{category}]")
-        for api, count in sorted(apis.items(), key=lambda x: x[1], reverse=True):
-            print(f"{api}: {count}")
-
-# **📌 실행 진입점**
+# 📌 실행
 def sampling_analyze(folder_path):
-    extensions = get_extension_list(folder_path)
-    if len(extensions) < 500:
-        print(f"ZIP files are under 500 ({len(extensions)} found)")
-        return
-
-    random.seed()
-    sampled_extensions = random.sample(extensions, 500)
-
-    print("\n[List of Extensions after sampling]\n")
-    for idx, ext in enumerate(sampled_extensions, start=1):
-        print(f"{idx}. {ext}")
+    extensions = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith(".zip")]
+    sampled_extensions = random.sample(extensions, min(500, len(extensions)))
+    
+    for ext in sampled_extensions:
         analyze_zip(ext)
 
-    print_api_results()
     save_to_csv()
 
-# **📌 Extension ZIP 파일 리스트를 가져옴**
-def get_extension_list(folder_path):
-    return [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith(".zip")]
-
-# **📌 실행 진입점**
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <Folder that includes ZIP files>")
-        sys.exit(1)
-
     sampling_analyze(sys.argv[1])
 
