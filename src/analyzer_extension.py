@@ -105,6 +105,7 @@ PERMISSION_TO_APIS = {
     "declarativeNetRequestFeedback": ["chrome.declarativeNetRequest.*"],
     "desktopCapture": ["chrome.desktopCapture.*"],
     "downloads": ["chrome.downloads.*"], # downloads.open, downloads.ui는 이 권한 하위 API임
+    "favicon": ["chrome.tabs.Tab.favIconUrl", "chrome.history.HistoryItem.favIconUrl"],
     "history": ["chrome.history.*"],
     "identity": ["chrome.identity.*"], # identity.email은 이 권한 하위 API 기능임
     "idle": ["chrome.idle.*"],
