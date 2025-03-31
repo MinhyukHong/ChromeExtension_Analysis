@@ -1,0 +1,84 @@
+Category,API,Total Count
+User Interaction,addEventListener,4875
+Rendering,setTimeout,4237
+Network,fetch,3842
+Rendering,document.createElement,2351
+File System,document.querySelector,1954
+Rendering,document.getElementById,1685
+File System,localStorage.getItem,561
+Rendering,setInterval,486
+Storage,chrome.storage.local.get,445
+Storage,chrome.storage.local.set,382
+Tabs,chrome.tabs.query,238
+Storage,localStorage.setItem,206
+Network,new XMLHttpRequest,206
+File System,new Blob,204
+Rendering,new MutationObserver,185
+Rendering,element.style,183
+Tabs,chrome.tabs.create,153
+Rendering,window.open,135
+Storage,chrome.storage.sync.get,133
+File System,document.cookie,101
+Storage,chrome.storage.sync.set,94
+Tabs,chrome.tabs.update,88
+Rendering,chrome.windows.create,66
+File System,sessionStorage.setItem,65
+Scripting,chrome.scripting.executeScript,64
+Tabs,chrome.tabs.onUpdated.addListener,62
+Tabs,chrome.tabs.get,61
+Tabs,chrome.tabs.remove,46
+Storage,sessionStorage.getItem,40
+Storage,indexedDB.open,39
+Rendering,canvas.getContext,30
+Clipboard,navigator.clipboard.writeText,30
+Tabs,chrome.tabs.executeScript,29
+Identity,chrome.identity.getAuthToken,29
+Bookmarks,chrome.bookmarks.get,28
+File System,file.name,25
+WebRequest,chrome.webRequest.onBeforeRequest,25
+Tabs,chrome.tabs.onActivated.addListener,24
+Notifications,chrome.notifications.create,23
+Network,navigator.sendBeacon,22
+Downloads,chrome.downloads.download,22
+Context Menus,chrome.contextMenus.create,22
+Rendering,element.innerHTML,21
+Alarms,chrome.alarms.create,19
+Alarms,chrome.alarms.onAlarm.addListener,16
+User Interaction,window.confirm,15
+Notifications,chrome.notifications.clear,14
+Context Menus,chrome.contextMenus.onClicked.addListener,14
+WebRequest,chrome.webRequest.onCompleted,14
+File System,file.size,12
+Alarms,chrome.alarms.clear,12
+Tabs,chrome.tabs.captureVisibleTab,11
+Network,new WebSocket,11
+User Interaction,window.onbeforeunload,11
+File System,file.type,10
+Storage,navigator.storage.persist,9
+User Interaction,chrome.permissions.request,9
+Bookmarks,chrome.bookmarks.create,9
+History,chrome.history.search,9
+Scripting,chrome.scripting.insertCSS,8
+Identity,chrome.identity.getProfileUserInfo,8
+Bookmarks,chrome.bookmarks.remove,8
+User Interaction,window.alert,7
+User Interaction,window.prompt,7
+Context Menus,chrome.contextMenus.remove,7
+Rendering,chrome.declarativeContent.onPageChanged,6
+User Interaction,document.onmousemove,6
+Clipboard,navigator.clipboard.readText,6
+Notifications,chrome.notifications.onClicked.addListener,6
+Notifications,chrome.notifications.update,5
+Alarms,chrome.alarms.get,5
+Clipboard,document.execCommand('copy'),4
+Scripting,chrome.scripting.registerContentScripts,3
+File System,store.put,3
+Bookmarks,chrome.bookmarks.update,3
+Downloads,chrome.downloads.search,3
+Identity,chrome.identity.launchWebAuthFlow,2
+History,chrome.history.deleteUrl,2
+Context Menus,chrome.contextMenus.update,2
+Scripting,chrome.scripting.removeCSS,1
+Network,new RTCPeerConnection,1
+Bookmarks,chrome.bookmarks.search,1
+WebRequest,chrome.webRequest.onHeadersReceived,1
