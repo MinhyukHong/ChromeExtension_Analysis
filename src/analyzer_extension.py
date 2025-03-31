@@ -1,370 +1,493 @@
 import os
 import zipfile
 import json
-import re
+import re # 단순 검색에는 필요 없지만, 나중을 위해 남겨둘 수 있음
 import random
 import csv
 from collections import defaultdict
+import logging
 
-# 📌 API 카테고리별 목록 정의 (기존 유지)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# 📌 API 카테고리별 목록 정의 (summary.csv 용도 - 실제 코드 검색 패턴 포함)
+# 이 목록은 extract_api_counts 함수에서 사용됨
 API_CATEGORIES = {
-    "File System": [
-        "document.querySelector", "file.name", "file.type", "file.size",
-        "file.lastModified", "new Blob", "FileReader.readAsText", "FileReader.readAsDataURL",
-        "FileReader.readAsArrayBuffer", "window.requestFileSystem", "fileEntry.createWriter",
-        "indexedDB.open", "indexedDB.transaction", "store.put", "localStorage.setItem",
-        "localStorage.getItem", "sessionStorage.setItem", "sessionStorage.getItem", "document.cookie",
-        "navigator.clipboard.readText", "navigator.clipboard.writeText",
-        "Element.requestPointerLock", # pointerLock 관련
+    "Clipboard": [
+        "navigator.clipboard.readText",
+        "navigator.clipboard.writeText",
+        "document.execCommand('paste')",
+        "document.execCommand('copy')"
     ],
-    "Network": [
-        "fetch", "new XMLHttpRequest", "new WebSocket", "navigator.sendBeacon",
-        "new RTCPeerConnection", "chrome.webRequest.onBeforeRequest.addListener",
-        "chrome.webRequest.onHeadersReceived.addListener", "chrome.identity.getAuthToken",
-        "chrome.proxy.settings.set", "chrome.dns.resolve",
-        "chrome.mdns.onServiceList", # mdns 관련
-        "chrome.signedInDevices.get", # signedInDevices 관련
-    ],
-    "Rendering": [
-        "document.createElement", "document.appendChild", "element.innerHTML",
-        "document.getElementById", "element.style",
-        "new MutationObserver", "chrome.tabs.executeScript", "setTimeout",
-        "setInterval", "canvas.getContext", "CanvasRenderingContext2D.drawImage",
-        "document.designMode", "shadowRoot.attachShadow", "window.open",
-        "chrome.windows.create", "chrome.tabs.create", "chrome.notifications.create",
-        "chrome.declarativeContent.onPageChanged", # declarativeContent 관련
-    ],
-    "User Interaction": [
-        "addEventListener", "document.onmousemove", "document.onkeypress",
-        "document.onkeydown", "window.onbeforeunload", "chrome.contextMenus.create",
-        "chrome.alarms.create", "chrome.notifications.onClicked.addListener",
-        "chrome.permissions.request", "chrome.tabs.onActivated.addListener",
-        "window.alert", "window.confirm", "window.prompt",
-        "chrome.input.ime.onFocus", # input (IME) 관련
-        "chrome.fileBrowserHandler.onExecute", # fileBrowserHandler 관련
+    "Downloads": [
+        "chrome.downloads.download",
+        "chrome.downloads.search",
+        "chrome.downloads.open",
+        "chrome.downloads.erase",
+        "chrome.downloads.removeFile"
     ],
     "Storage": [
-        "chrome.storage.local.get", "chrome.storage.local.set",
-        "chrome.storage.sync.get", "chrome.storage.sync.set",
+        "chrome.storage.local.get",
+        "chrome.storage.local.set",
+        "chrome.storage.sync.get",
+        "chrome.storage.sync.set",
+        "indexedDB.open",
+        "localStorage.setItem",
+        "sessionStorage.getItem",
+        "navigator.storage.persist"
     ],
-    "Device": [
-        "navigator.geolocation.getCurrentPosition", "navigator.geolocation.watchPosition",
-        "navigator.mediaDevices.getUserMedia", "navigator.mediaDevices.enumerateDevices",
-        "chrome.usb.findDevices", # usb 관련
-        "chrome.hid.getDevices", # hid 관련
-        "chrome.serial.getDevices", # serial 관련
-        "chrome.documentScan.scan", # documentScan 관련
+    "Tabs": [
+        "chrome.tabs.create",
+        "chrome.tabs.query",
+        "chrome.tabs.update",
+        "chrome.tabs.get",
+        "chrome.tabs.remove",
+        "chrome.tabs.executeScript",
+        "chrome.tabs.onUpdated.addListener",
+        "chrome.tabs.onActivated.addListener",
+        "chrome.tabs.captureVisibleTab"
     ],
-    "Security": [
-        "chrome.permissions.request", "chrome.identity.getAuthToken",
-        "chrome.privacy.network.webRTCIPHandlingPolicy",
-        "chrome.enterprise.deviceAttributes.getDirectoryDeviceId", # enterprise 관련
-        "chrome.enterprise.platformKeys.getToken", # enterprise 관련
-        "chrome.platformKeys.selectClientCertificates", # platformKeys 관련
-        "chrome.certificateProvider.requestPin", # certificateProvider 관련
+    "Scripting": [
+        "chrome.scripting.executeScript",
+        "chrome.scripting.insertCSS",
+        "chrome.scripting.removeCSS",
+        "chrome.scripting.registerContentScripts"
     ],
-    "System": [
-         "chrome.system.cpu.getInfo",
-         "chrome.system.display.getInfo",
-         "chrome.system.memory.getInfo",
-         "chrome.system.storage.getInfo",
-         "chrome.system.network.getNetworkInterfaces", # system.network 관련
+    "Identity": [
+        "chrome.identity.getAuthToken",
+        "chrome.identity.getProfileUserInfo",
+        "chrome.identity.launchWebAuthFlow"
     ],
-    # 추가된 API 카테고리 또는 기존 카테고리에 분배
-    "File System Provider": [ # ChromeOS
-        "chrome.fileSystemProvider.mount",
-        "chrome.fileSystemProvider.onOpenFileRequested",
+    "WebRequest": [
+        "chrome.webRequest.onBeforeRequest",
+        "chrome.webRequest.onHeadersReceived",
+        "chrome.webRequest.onCompleted"
     ],
-    "User Scripts": [
-        "chrome.userScripts.register",
+    "Bookmarks": [
+        "chrome.bookmarks.create",
+        "chrome.bookmarks.get",
+        "chrome.bookmarks.search",
+        "chrome.bookmarks.update",
+        "chrome.bookmarks.remove"
+    ],
+    "History": [
+        "chrome.history.search",
+        "chrome.history.addUrl",
+        "chrome.history.deleteUrl",
+        "chrome.history.deleteAll"
+    ],
+    "Alarms": [
+        "chrome.alarms.create",
+        "chrome.alarms.get",
+        "chrome.alarms.clear",
+        "chrome.alarms.onAlarm.addListener"
+    ],
+    "Notifications": [
+        "chrome.notifications.create",
+        "chrome.notifications.update",
+        "chrome.notifications.clear",
+        "chrome.notifications.onClicked.addListener"
+    ],
+    "Context Menus": [
+        "chrome.contextMenus.create",
+        "chrome.contextMenus.update",
+        "chrome.contextMenus.remove",
+        "chrome.contextMenus.onClicked.addListener"
+    ],
+    "File System": [
+        "document.querySelector",
+        "file.name",
+        "file.type",
+        "file.size",
+        "file.lastModified",
+        "new Blob",
+        "FileReader.readAsText",
+        "FileReader.readAsDataURL",
+        "FileReader.readAsArrayBuffer",
+        "window.requestFileSystem",
+        "fileEntry.createWriter",
+        "indexedDB.transaction",
+        "store.put",
+        "localStorage.getItem",
+        "sessionStorage.setItem",
+        "document.cookie",
+        "Element.requestPointerLock"
+    ],
+    "Network": [
+        "fetch",
+        "new XMLHttpRequest",
+        "new WebSocket",
+        "navigator.sendBeacon",
+        "new RTCPeerConnection",
+        "chrome.proxy.settings.set",
+        "chrome.dns.resolve",
+        "chrome.mdns.onServiceList",
+        "chrome.signedInDevices.get"
+    ],
+    "Rendering": [
+        "document.createElement",
+        "document.appendChild",
+        "element.innerHTML",
+        "document.getElementById",
+        "element.style",
+        "new MutationObserver",
+        "setTimeout",
+        "setInterval",
+        "canvas.getContext",
+        "CanvasRenderingContext2D.drawImage",
+        "document.designMode",
+        "shadowRoot.attachShadow",
+        "window.open",
+        "chrome.windows.create",
+        "chrome.declarativeContent.onPageChanged"
+    ],
+    "User Interaction": [
+        "addEventListener",
+        "document.onmousemove",
+        "document.onkeypress",
+        "document.onkeydown",
+        "window.onbeforeunload",
+        "chrome.permissions.request",
+        "window.alert",
+        "window.confirm",
+        "window.prompt",
+        "chrome.input.ime.onFocus",
+        "chrome.fileBrowserHandler.onExecute"
     ]
 }
-
-# API -> Category 매핑 (기존 유지)
+# API 키워드 -> Category 매핑 (summary.csv 용도)
 API_TO_CATEGORY = {api: category for category, apis in API_CATEGORIES.items() for api in apis}
 
-# 📌 권한별 필요한 API 매핑 (기존 유지)
+
+# 📌 권한별 필요한 API 매핑 (검색 가능한 실제 API 패턴 위주로 정제)
+# 키: Manifest에 선언되는 실제 권한 이름
+# 값: 해당 권한 사용 시 코드에서 발견될 가능성이 높은 API 호출 패턴 (문자열) 리스트
 PERMISSION_TO_APIS = {
-    # User Choice / Activation
-    "activeTab": ["chrome.scripting.*", "chrome.tabs.captureVisibleTab", "chrome.tabs.get", "chrome.tabs.update"],
-
-    # Core Extension APIs
-    "alarms": ["chrome.alarms.*"],
-    "bookmarks": ["chrome.bookmarks.*"],
-    "browsingData": ["chrome.browsingData.*"],
+    "activeTab": ["chrome.scripting.executeScript", "chrome.scripting.insertCSS", "chrome.tabs.captureVisibleTab"], # get/update는 tabs 권한과 겹침
+    "alarms": ["chrome.alarms."], # Prefix 사용
+    "bookmarks": ["chrome.bookmarks."],
+    "browsingData": ["chrome.browsingData."],
     "clipboardRead": ["navigator.clipboard.readText", "document.execCommand('paste')"],
-    "clipboardWrite": ["navigator.clipboard.writeText", "document.execCommand('copy')", "document.execCommand('cut')", "navigator.clipboard.write"],
-    "commands": ["chrome.commands.*"],
-    "contentSettings": ["chrome.contentSettings.*"],
-    "contextMenus": ["chrome.contextMenus.*"],
-    "cookies": ["chrome.cookies.*"], # Host Permissions 필요
-    "debugger": ["chrome.debugger.*"],
-    "declarativeContent": ["chrome.declarativeContent.*"],
-    "declarativeNetRequest": ["chrome.declarativeNetRequest.*"],
-    "declarativeNetRequestWithHostAccess": ["chrome.declarativeNetRequest.*"], # Host Permissions 필요
-    "declarativeNetRequestFeedback": ["chrome.declarativeNetRequest.*"],
-    "desktopCapture": ["chrome.desktopCapture.*"],
-    "downloads": ["chrome.downloads.*"], # downloads.open, downloads.ui는 이 권한 하위 API임
-    "favicon": ["chrome.tabs.Tab.favIconUrl", "chrome.history.HistoryItem.favIconUrl"],
-    "history": ["chrome.history.*"],
-    "identity": ["chrome.identity.*"], # identity.email은 이 권한 하위 API 기능임
-    "idle": ["chrome.idle.*"],
-    "management": ["chrome.management.*"],
+    "clipboardWrite": ["navigator.clipboard.writeText", "document.execCommand('copy')"],
+    "commands": ["chrome.commands."],
+    "contentSettings": ["chrome.contentSettings."],
+    "contextMenus": ["chrome.contextMenus."],
+    "cookies": ["chrome.cookies."], # Host Permissions 필요
+    "debugger": ["chrome.debugger."],
+    "declarativeContent": ["chrome.declarativeContent."],
+    "declarativeNetRequest": ["chrome.declarativeNetRequest."],
+    "declarativeNetRequestWithHostAccess": ["chrome.declarativeNetRequest."],
+    "declarativeNetRequestFeedback": ["chrome.declarativeNetRequest."],
+    "desktopCapture": ["chrome.desktopCapture."],
+    "downloads": ["chrome.downloads."],
+    "history": ["chrome.history."],
+    "identity": ["chrome.identity."],
+    "idle": ["chrome.idle."],
+    "management": ["chrome.management."],
     "nativeMessaging": ["chrome.runtime.connectNative", "chrome.runtime.sendNativeMessage"],
-    "notifications": ["chrome.notifications.*"],
-    "offscreen": ["chrome.offscreen.*"],
-    "pageCapture": ["chrome.pageCapture.*"],
-    "permissions": ["chrome.permissions.*"], # 선택적 권한 관리
-    "power": ["chrome.power.*"],
-    "privacy": ["chrome.privacy.*"],
-    "proxy": ["chrome.proxy.*"],
-    "pushMessaging": ["chrome.pushMessaging.*", "PushManager.*"],
-    "scripting": ["chrome.scripting.*"], # Host Permissions 또는 activeTab 필요
-    "search": ["chrome.search.*"],
-    "sessions": ["chrome.sessions.*"],
-    "sidePanel": ["chrome.sidePanel.*"],
-    "storage": ["chrome.storage.*"],
-    "system.cpu": ["chrome.system.cpu.*"],
-    "system.display": ["chrome.system.display.*"],
-    "system.memory": ["chrome.system.memory.*"],
-    "system.storage": ["chrome.system.storage.*"],
-    "tabCapture": ["chrome.tabCapture.*"],
-    "tabGroups": ["chrome.tabGroups.*"],
-    "tabs": ["chrome.tabs.*"], # 민감 정보 접근 시 Host Permissions 또는 activeTab 필요
-    "topSites": ["chrome.topSites.*"],
-    "tts": ["chrome.tts.*"],
-    "ttsEngine": ["chrome.ttsEngine.*"],
-    "unlimitedStorage": ["chrome.storage.local", "indexedDB", "Cache API"],
-    "webNavigation": ["chrome.webNavigation.*"], # Host Permissions 필요할 수 있음
-    "webRequest": ["chrome.webRequest.*"], # MV3에서는 관찰만 가능, Host Permissions 필요
-
-    # Newly Added / Reviewed Permissions
-    "userScripts": ["chrome.userScripts.*"], # Host Permissions 필요
-    "mdns": ["chrome.mdns.*"],
-    "system.network": ["chrome.system.network.*"],
-    "certificateProvider": ["chrome.certificateProvider.*"], # (ChromeOS)
-    "documentScan": ["chrome.documentScan.*"], # (ChromeOS)
-    "pointerLock": ["Element.requestPointerLock"], # (Web API)
-    "signedInDevices": ["chrome.signedInDevices.*"],
-    "usb": ["chrome.usb.*"], # (User Consent 필요)
-    "hid": ["chrome.hid.*"], # (User Consent 필요)
-    "serial": ["chrome.serial.*"], # (User Consent 필요)
-    "input": ["chrome.input.ime.*"], # (IME)
-
-    # Enterprise Specific (ChromeOS / Managed Env)
-    "enterprise.deviceAttributes": ["chrome.enterprise.deviceAttributes.*"],
-    "enterprise.hardwarePlatform": ["chrome.enterprise.hardwarePlatform.*"],
-    "enterprise.networkingAttributes": ["chrome.enterprise.networkingAttributes.*"],
-    "enterprise.platformKeys": ["chrome.enterprise.platformKeys.*"],
-    "platformKeys": ["chrome.platformKeys.*"], # (ChromeOS, Non-Enterprise version)
-
+    "notifications": ["chrome.notifications."],
+    "offscreen": ["chrome.offscreen."],
+    "pageCapture": ["chrome.pageCapture."],
+    "permissions": ["chrome.permissions."],
+    "power": ["chrome.power."],
+    "privacy": ["chrome.privacy."],
+    "processes": ["chrome.processes."],
+    "proxy": ["chrome.proxy."],
+    "pushMessaging": ["chrome.pushMessaging.", "PushManager."],
+    "scripting": ["chrome.scripting."], # Host Permissions 또는 activeTab 필요
+    "search": ["chrome.search."],
+    "sessions": ["chrome.sessions."],
+    "sidePanel": ["chrome.sidePanel."],
+    "storage": ["chrome.storage."], # 기본적인 storage API
+    "system.cpu": ["chrome.system.cpu."],
+    "system.display": ["chrome.system.display."],
+    "system.memory": ["chrome.system.memory."],
+    "system.storage": ["chrome.system.storage."],
+    "tabCapture": ["chrome.tabCapture."],
+    "tabGroups": ["chrome.tabGroups."],
+    "tabs": ["chrome.tabs."],
+    "topSites": ["chrome.topSites."],
+    "tts": ["chrome.tts."],
+    "ttsEngine": ["chrome.ttsEngine."],
+    # unlimitedStorage: 관련 스토리지 API 사용 시 제거 (아래 API들)
+    "unlimitedStorage": ["chrome.storage.local.", "indexedDB.", "navigator.storage.persist", "CacheStorage.", "caches."],#기존 storage 10MB 이상
+    "webNavigation": ["chrome.webNavigation."],
+    "webRequest": ["chrome.webRequest."], # Listener 추가/제거가 주 사용 형태
+    # Additional Permissions
+    "userScripts": ["chrome.userScripts."],
+    "mdns": ["chrome.mdns."],
+    "system.network": ["chrome.system.network."],
+    "certificateProvider": ["chrome.certificateProvider."],
+    "documentScan": ["chrome.documentScan."],
+    "pointerLock": ["requestPointerLock", "exitPointerLock"], # Element/document 메소드
+    "signedInDevices": ["chrome.signedInDevices."],
+    "usb": ["chrome.usb."],
+    "hid": ["chrome.hid."],
+    "serial": ["chrome.serial."],
+    "input": ["chrome.input.ime."],
+    "favicon": [], # 분석 대상 아님 (Known 처리용)
+    # Enterprise Specific
+    "enterprise.deviceAttributes": ["chrome.enterprise.deviceAttributes."],
+    "enterprise.hardwarePlatform": ["chrome.enterprise.hardwarePlatform."],
+    "enterprise.networkingAttributes": ["chrome.enterprise.networkingAttributes."],
+    "enterprise.platformKeys": ["chrome.enterprise.platformKeys."],
+    "platformKeys": ["chrome.platformKeys."],
     # ChromeOS Specific
-    "fileBrowserHandler": ["chrome.fileBrowserHandler.*"],
-    "fileSystemProvider": ["chrome.fileSystemProvider.*"],
-
+    "fileBrowserHandler": ["chrome.fileBrowserHandler."],
+    "fileSystemProvider": ["chrome.fileSystemProvider."],
+    "loginState": ["chrome.loginState."],
+    "printerProvider": ["chrome.printerProvider."],
+    "vpnProvider": ["chrome.vpnProvider."],
+    "webAuthenticationProxy": ["chrome.webAuthenticationProxy."],
     # Device Access
-    "geolocation": ["navigator.geolocation.*"],
-
+    "geolocation": ["navigator.geolocation."], # Prefix 사용
     # Deprecated
-    "gcm": ["chrome.gcm.*"], # Deprecated, use pushMessaging
-    "webRequestBlocking": ["chrome.webRequest.*"], # MV3에서는 declarativeNetRequest 사용
+    "gcm": ["chrome.gcm."],
+    "webRequestBlocking": ["chrome.webRequest."],
+
+    "background": [],
 }
+# 모든 검색 대상 API 패턴 생성 (중복 제거)
+ALL_SEARCH_PATTERNS = set()
+for patterns in PERMISSION_TO_APIS.values():
+    ALL_SEARCH_PATTERNS.update(p for p in patterns if p) # 빈 문자열 제외
 
 
 SAMPLE_RESULTS = []
 
-# 📌 API 검출 (기존 유지)
-def extract_apis(content):
-    found_apis = defaultdict(int)
-    for api in API_TO_CATEGORY.keys():
+# 📌 API 사용 횟수 계산 함수 (summary.csv용)
+def extract_api_counts(content):
+    """주어진 content에서 API_CATEGORIES 키워드의 사용 횟수를 계산합니다."""
+    counts = defaultdict(int)
+    for api_keyword in API_TO_CATEGORY.keys(): # API_CATEGORIES의 키워드 사용
         try:
-            count = content.count(api)
-            if count > 0:
-                found_apis[api] += count
-        except Exception as e:
-            print(f"Error counting API '{api}': {e}")
-            continue
-    return found_apis
+            count = content.count(api_keyword)
+            if count > 0: counts[api_keyword] += count
+        except Exception as e: logging.error(f"Error counting API '{api_keyword}': {e}"); continue
+    return counts
 
-# 📌 manifest.json에서 permissions 추출 및 API 매칭 (수정됨 - 하위 권한 처리 로직 추가)
-def extract_permissions_and_apis(content):
+# 📌 코드 내용에서 API 패턴 존재 여부 확인 함수 (Over-permission 분석용)
+def extract_apis_from_content(content, search_patterns):
+    """주어진 content에서 search_patterns 목록의 문자열이 하나라도 존재하는지 확인하고,
+       존재하는 패턴들을 set으로 반환합니다."""
+    found_patterns = set()
+    # 모든 정의된 검색 패턴에 대해 반복
+    for pattern in search_patterns:
+        try:
+            # 단순 문자열 포함 여부 확인 (find()와 유사)
+            if pattern in content:
+                found_patterns.add(pattern)
+                logging.debug(f"Found pattern: {pattern}") # 디버깅 시 주석 해제
+        except Exception as e:
+            # 매우 긴 패턴이나 특수 문자가 많은 경우 오류 발생 가능성 있음
+            logging.warning(f"Error searching for pattern '{pattern}': {e}")
+            continue
+    return found_patterns
+
+# 📌 manifest.json에서 permissions 추출 함수 (Known API 권한만 필터링)
+def extract_permissions_from_manifest(content):
+    """Manifest에서 모든 권한 목록과, PERMISSION_TO_APIS에 정의된 알려진 API 권한 목록을 추출합니다."""
+    all_declared_permissions = []
+    declared_known_api_permissions = set()
     try:
         manifest = json.loads(content)
         permissions_in_manifest = set(manifest.get("permissions", []))
         host_permissions_in_manifest = set(manifest.get("host_permissions", []))
+        all_declared_permissions = list(permissions_in_manifest.union(host_permissions_in_manifest))
 
-        all_permissions = list(permissions_in_manifest.union(host_permissions_in_manifest))
+        # 알려진 최상위 API 권한만 필터링 (PERMISSION_TO_APIS의 키와 비교)
+        for perm in permissions_in_manifest:
+            # 호스트 권한 아니고, PERMISSION_TO_APIS의 키에 존재하면 추가
+            if not perm.startswith(('<', 'http:', 'https:', '*:', 'file:')) and perm in PERMISSION_TO_APIS:
+                 # 'favicon' 같이 분석 안 할 권한은 제외할 수도 있음 (여기서는 일단 포함시키되, PERMISSION_TO_APIS 값이 비어있음)
+                 declared_known_api_permissions.add(perm)
 
-        # manifest에 선언된 permission 중 PERMISSION_TO_APIS 딕셔너리에 정의되지 않은 것들 찾기 (하위 권한 제외 로직 추가)
-        known_defined_permissions = set(PERMISSION_TO_APIS.keys())
-        unmatched_permissions = []
-
-        # API 관련 권한만 필터링 (호스트 권한 패턴 제외)
-        api_permissions_from_manifest = {p for p in permissions_in_manifest if not p.startswith(('<', 'http:', 'https:', '*:', 'file:'))}
-
-        for p in api_permissions_from_manifest:
-            is_known = False
-            # 1. 정확히 일치하는지 확인
-            if p in known_defined_permissions:
-                is_known = True
-            # 2. 정확히 일치하지 않고 '.'을 포함하는 경우, 상위 권한이 알려진 것인지 확인
-            elif '.' in p:
-                parent_p = p.split('.')[0]
-                if parent_p in known_defined_permissions:
-                    # 상위 권한이 정의되어 있으면 하위 항목도 알려진 것으로 간주
-                    is_known = True
-                    # print(f"Info: Permission '{p}' considered known because parent '{parent_p}' is defined.") # 디버깅용 로그
-
-            # 알려지지 않은 경우에만 unmatched 리스트에 추가
-            if not is_known:
-                unmatched_permissions.append(p)
-
-        return all_permissions, unmatched_permissions
+        return all_declared_permissions, declared_known_api_permissions
     except json.JSONDecodeError:
-        print("Warning: Failed to decode manifest.json")
-        return [], []
+        logging.error("Failed to decode manifest.json")
+        return [], set()
     except Exception as e:
-        print(f"Error processing manifest: {e}")
-        return [], []
+        logging.error(f"Error processing manifest: {e}")
+        return [], set()
 
+# 📌 "API 패턴 -> 필요 권한" 매핑 생성 함수
+def create_api_pattern_to_permission_map(permission_map):
+    """PERMISSION_TO_APIS를 기반으로 역방향 매핑 생성"""
+    api_to_perms = defaultdict(set)
+    for permission, api_patterns in permission_map.items():
+        # 빈 패턴 리스트(e.g., favicon)는 건너뛰기
+        if not api_patterns:
+            continue
+        for pattern in api_patterns:
+            if pattern: # 유효한 패턴만 추가
+                api_to_perms[pattern].add(permission)
+    logging.debug(f"API Pattern -> Permissions map created with {len(api_to_perms)} entries.")
+    return api_to_perms
 
-# 📌 ZIP 파일 내 파일 검사 (기존 유지)
-def analyze_zip(zip_path):
+# 📌 ZIP 파일 내 파일 검사 (Over-permission 분석 로직)
+def analyze_zip(zip_path, api_pattern_to_permission_map, all_search_patterns):
+    """개별 ZIP 파일을 분석하여 Over-permission을 찾습니다."""
+    declared_permissions_all = []
+    declared_known_api_permissions = set()
+    potential_over_permissions = set()
+    found_api_patterns_in_code = set() # 전체 JS 파일에서 발견된 모든 API 패턴
     api_counts = defaultdict(lambda: defaultdict(int))
-    permissions_from_manifest = []
-    unmatched_permissions_from_manifest = []
     wasm_exist = "X"
+    manifest_found = False
 
     try:
         with zipfile.ZipFile(zip_path, 'r') as z:
-            manifest_content = None
+            # 1단계: Manifest 읽기
             for name in z.namelist():
-                if name.startswith("__MACOSX/") or name.startswith("._") or name == ".DS_Store":
-                    continue
+                if name.startswith("__MACOSX/") or name.startswith("._") or name == ".DS_Store": continue
                 if name.lower().endswith("manifest.json"):
+                    manifest_found = True
                     try:
                         with z.open(name) as f:
-                            manifest_content = f.read().decode("utf-8", errors="ignore")
-                            permissions_from_manifest, unmatched_permissions_from_manifest = extract_permissions_and_apis(manifest_content)
+                            manifest_content = f.read().decode("utf-8", errors='replace')
+                            declared_permissions_all, declared_known_api_permissions = extract_permissions_from_manifest(manifest_content)
+                            potential_over_permissions = declared_known_api_permissions.copy() # 분석 시작점
+                            logging.info(f"Manifest read for {os.path.basename(zip_path)}. Known API permissions to check: {declared_known_api_permissions}")
                             break
-                    except Exception as e:
-                         print(f"Error reading manifest {name} in {zip_path}: {e}")
+                    except Exception as e: logging.error(f"Error reading manifest {name} in {zip_path}: {e}")
 
-            if manifest_content is None:
-                 print(f"Warning: manifest.json not found in {zip_path}. Skipping analysis.")
+            if not manifest_found:
+                 logging.warning(f"manifest.json not found in {zip_path}. Cannot perform over-permission analysis.")
+                 # Manifest 없으면 결과에 에러 표시하고 반환
+                 SAMPLE_RESULTS.append({"zip": os.path.basename(zip_path), "permissions": ["Error: manifest.json not found"], "over_permissions": [], "wasm_exist": "X", "api_counts": {}})
                  return
 
+            # 2단계: JS 코드 분석 및 API 패턴 추출
+            logging.info(f"Scanning JS files in {os.path.basename(zip_path)}...")
+            js_files_count = 0
             for name in z.namelist():
-                if name.startswith("__MACOSX/") or name.startswith("._") or name == ".DS_Store" or name.lower().endswith("manifest.json"):
-                    continue
-
-                if name.endswith(".wasm"):
-                    wasm_exist = "O"
+                if name.startswith("__MACOSX/") or name.startswith("._") or name == ".DS_Store" or name.lower().endswith("manifest.json"): continue
+                if name.endswith(".wasm"): wasm_exist = "O"
 
                 if name.endswith(".js"):
+                    js_files_count += 1
+                    logging.debug(f"Reading JS file: {name}")
                     try:
                         with z.open(name) as f:
-                            content = f.read().decode("utf-8", errors="ignore")
-                            found_apis_in_file = extract_apis(content)
-                            for api, count in found_apis_in_file.items():
+                            # 파일을 한번에 읽음 (메모리 사용량 주의)
+                            content = f.read().decode("utf-8", errors='replace')
+                            if not content: # 빈 파일 스킵
+                                logging.debug(f"Skipping empty JS file: {name}")
+                                continue
+
+                            # Over-permission 분석용 API 패턴 추출 (단순 포함 검색)
+                            patterns_in_file = extract_apis_from_content(content, all_search_patterns)
+                            if patterns_in_file:
+                                logging.debug(f"API patterns found in {name}: {patterns_in_file}")
+                                found_api_patterns_in_code.update(patterns_in_file) # 세트에 누적
+
+                            # API 카운트 (부가 정보)
+                            temp_api_counts = extract_api_counts(content)
+                            for api, count in temp_api_counts.items():
                                 category = API_TO_CATEGORY.get(api, "Unknown")
                                 api_counts[category][api] += count
+                    # 파일 읽기/디코딩 오류는 개별 파일에 대해 로깅하고 계속 진행
+                    except UnicodeDecodeError as ude:
+                        logging.warning(f"Unicode decode error in JS file {name}: {ude}. Skipping file content analysis.")
                     except Exception as e:
-                        print(f"Error reading JS file {name} in {zip_path}: {e}")
+                        logging.error(f"Error reading or processing JS file {name} in {zip_path}: {e}")
+            logging.info(f"Finished scanning {js_files_count} JS files. Total unique API patterns found: {len(found_api_patterns_in_code)}")
+            logging.debug(f"All found API patterns: {found_api_patterns_in_code}")
+
+            # 3단계: Over-permission 분석
+            logging.info("Analyzing for over-permissions...")
+            permissions_confirmed_used = set() # 이번 분석에서 사용된 것으로 확인된 권한
+
+            # 발견된 모든 API 패턴에 대해 반복
+            for found_pattern in found_api_patterns_in_code:
+                # 이 패턴이 필요로 하는 권한들을 찾음
+                required_permissions = api_pattern_to_permission_map.get(found_pattern, set())
+                if required_permissions:
+                    logging.debug(f"Pattern '{found_pattern}' requires permissions: {required_permissions}")
+                    # 이 권한들이 원래 선언된 권한 목록에 있는지 확인
+                    for req_perm in required_permissions:
+                        if req_perm in declared_known_api_permissions: # potential_over_permissions 대신 원래 선언된 목록과 비교
+                            permissions_confirmed_used.add(req_perm)
+                            logging.debug(f"Confirmed usage for permission: {req_perm}")
+
+            # 최종 Over-permission = (선언된 알려진 API 권한) - (사용된 것으로 확인된 권한)
+            final_over_permissions = declared_known_api_permissions - permissions_confirmed_used
+            logging.info(f"Over-permission analysis complete. Identified as potentially unused: {final_over_permissions}")
+
 
     except zipfile.BadZipFile:
-        print(f"Failed to open zip file (BadZipFile): {zip_path}")
-        SAMPLE_RESULTS.append({
-            "zip": os.path.basename(zip_path),
-            "permissions": ["Error: BadZipFile"],
-            "unmatched_permissions": [],
-            "wasm_exist": "X",
-            "api_counts": {}
-        })
+        logging.error(f"Failed to open zip file (BadZipFile): {zip_path}")
+        SAMPLE_RESULTS.append({"zip": os.path.basename(zip_path), "permissions": ["Error: BadZipFile"], "over_permissions": [], "wasm_exist": "X", "api_counts": {}})
         return
     except Exception as e:
-        print(f"An unexpected error occurred analyzing {zip_path}: {e}")
-        SAMPLE_RESULTS.append({
-            "zip": os.path.basename(zip_path),
-            "permissions": [f"Error: {type(e).__name__}"],
-            "unmatched_permissions": [],
-            "wasm_exist": "X",
-            "api_counts": {}
-        })
+        logging.error(f"An unexpected error occurred analyzing {zip_path}: {e}", exc_info=True)
+        SAMPLE_RESULTS.append({"zip": os.path.basename(zip_path), "permissions": [f"Error: {type(e).__name__}"], "over_permissions": [], "wasm_exist": "X", "api_counts": {}})
         return
 
+    # 최종 결과 저장
     SAMPLE_RESULTS.append({
         "zip": os.path.basename(zip_path),
-        "permissions": permissions_from_manifest,
-        "unmatched_permissions": unmatched_permissions_from_manifest,
+        "permissions": declared_permissions_all, # Manifest의 모든 권한
+        "over_permissions": sorted(list(final_over_permissions)), # 최종 Over-permission 목록
         "wasm_exist": wasm_exist,
         "api_counts": dict(api_counts)
     })
 
-# 📌 CSV 저장 (기존 유지)
-def save_to_csv():
-    categories = list(API_CATEGORIES.keys()) + ["Unknown"]
 
+# 📌 CSV 저장 함수 (기존 유지)
+def save_to_csv():
+    # ...(이전과 동일)...
+    categories = list(API_CATEGORIES.keys()) + ["Unknown"]
     with open("summary.csv", "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["Category", "API", "Total Count"])
-
         total_counts = defaultdict(lambda: defaultdict(int))
         for result in SAMPLE_RESULTS:
             if isinstance(result.get("api_counts"), dict):
                 for category, apis in result["api_counts"].items():
-                    for api, count in apis.items():
-                        total_counts[category][api] += count
-
+                    for api, count in apis.items(): total_counts[category][api] += count
         all_apis_sorted = []
         for category, apis in total_counts.items():
-            for api, count in apis.items():
-                all_apis_sorted.append((category, api, count))
-
+            for api, count in apis.items(): all_apis_sorted.append((category, api, count))
         all_apis_sorted.sort(key=lambda x: x[2], reverse=True)
-        for category, api, count in all_apis_sorted:
-             writer.writerow([category, api, count])
+        for category, api, count in all_apis_sorted: writer.writerow([category, api, count])
 
     with open("detailed_analysis.csv", "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow([
-            "ZIP File", "Permissions (manifest)",
-            "Unmatched Permissions (Unknown to script)",
-            "WASM Exist"
+            "ZIP File", "Permissions (manifest)", "Over Permissions", "WASM Exist"
         ] + categories)
-
         for result in SAMPLE_RESULTS:
             permissions_list = result.get("permissions", [])
-            unmatched_list = result.get("unmatched_permissions", [])
+            over_permissions_list = result.get("over_permissions", [])
             wasm_val = result.get("wasm_exist", "X")
             api_counts_dict = result.get("api_counts", {})
-
             row = [
                 result.get("zip", "Unknown ZIP"),
-                json.dumps(permissions_list, ensure_ascii=False),
-                json.dumps(unmatched_list, ensure_ascii=False),
+                json.dumps(permissions_list, ensure_ascii=False, sort_keys=True),
+                json.dumps(over_permissions_list, ensure_ascii=False, sort_keys=True),
                 wasm_val
             ]
-
-            if not isinstance(api_counts_dict, dict):
-                api_counts_dict = {}
-
+            if not isinstance(api_counts_dict, dict): api_counts_dict = {}
             for category in categories:
                 category_apis = api_counts_dict.get(category, {})
                 sorted_counts = sorted(category_apis.items(), key=lambda x: x[1], reverse=True)
                 row.append(json.dumps({api: count for api, count in sorted_counts}, ensure_ascii=False))
             writer.writerow(row)
 
-# 📌 실행 (기존 유지)
+
+# 📌 실행 부분
 def sampling_analyze(folder_path, sample_size=None):
+    # 분석 시작 전, 필요한 매핑 생성
+    api_pattern_to_permission_map = create_api_pattern_to_permission_map(PERMISSION_TO_APIS)
+    # 모든 검색 대상 패턴 미리 준비
+    all_search_patterns = set(p for patterns in PERMISSION_TO_APIS.values() for p in patterns if p)
+
     extensions = []
     for f in os.listdir(folder_path):
         if f.endswith(".zip") or f.endswith(".crx"):
             extensions.append(os.path.join(folder_path, f))
 
-    if not extensions:
-        print(f"No .zip or .crx files found in {folder_path}")
-        return
+    if not extensions: logging.warning(f"No .zip or .crx files found in {folder_path}"); return
 
     if sample_size is not None and sample_size > 0 and sample_size < len(extensions):
         sampled_extensions = random.sample(extensions, sample_size)
@@ -377,7 +500,10 @@ def sampling_analyze(folder_path, sample_size=None):
     for ext_path in sampled_extensions:
         count += 1
         print(f"[{count}/{len(sampled_extensions)}] Analyzing: {os.path.basename(ext_path)}")
-        analyze_zip(ext_path)
+        logging.info(f"Starting analysis for: {os.path.basename(ext_path)}")
+        # analyze_zip 호출 시 필요한 매핑 전달
+        analyze_zip(ext_path, api_pattern_to_permission_map, all_search_patterns)
+        logging.info(f"Finished analysis for: {os.path.basename(ext_path)}")
 
     if SAMPLE_RESULTS:
         print("Analysis complete. Saving results to CSV...")
@@ -386,28 +512,13 @@ def sampling_analyze(folder_path, sample_size=None):
     else:
         print("Analysis completed, but no results were generated.")
 
-
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) < 2:
-        print("Usage: python your_script_name.py <path_to_extensions_folder> [sample_size]")
-        print("       [sample_size] is optional. If omitted, all extensions are analyzed.")
-        sys.exit(1)
-
-    folder = sys.argv[1]
-    size = None
+    if len(sys.argv) < 2: print("Usage: python ... <folder> [sample_size]"); sys.exit(1)
+    folder = sys.argv[1]; size = None
     if len(sys.argv) > 2:
-        try:
-            size = int(sys.argv[2])
-            if size <= 0:
-                 print("Warning: Sample size must be positive. Analyzing all extensions.")
-                 size = None
-        except ValueError:
-            print("Warning: Invalid sample size provided. Analyzing all extensions.")
-            size = None
-
-    if not os.path.isdir(folder):
-        print(f"Error: Folder not found - {folder}")
-        sys.exit(1)
-
+        try: size = int(sys.argv[2]);
+        except ValueError: size = None
+        if size is not None and size <= 0: size = None
+    if not os.path.isdir(folder): print(f"Error: Folder not found - {folder}"); sys.exit(1)
     sampling_analyze(folder, size)
