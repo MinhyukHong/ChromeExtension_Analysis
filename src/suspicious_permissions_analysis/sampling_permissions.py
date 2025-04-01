@@ -6,12 +6,12 @@ import zipfile
 
 # Over-Permissioned 권한 목록
 OVER_PERMISSIONED = {
-    "tabs", "webRequest", "webRequestBlocking", "clipboardRead",
+    "webRequest", "webRequestBlocking", "clipboardRead",
     "clipboardWrite", "nativeMessaging", "proxy", "debugger",
     "downloads", "management", "history", "cookies", "bookmarks"
 }
 
-SAMPLE_SIZE = 500  # 랜덤 샘플링 개수
+SAMPLE_SIZE = 2000  # 랜덤 샘플링 개수
 
 # ZIP 파일 리스트 가져오기 (하위 폴더 포함)
 def get_zip_files(root_folder):
@@ -54,13 +54,13 @@ def analyze_sampled_extensions(input_folder, output_csv):
     zip_files = get_zip_files(input_folder)
 
     if len(zip_files) < SAMPLE_SIZE:
-        print(f"ZIP 파일이 500개 미만입니다. ({len(zip_files)}개 발견됨)")
+        print(f"ZIP 파일이 2000개 미만입니다. ({len(zip_files)}개 발견됨)")
         return
 
     # 랜덤 샘플링
     sampled_files = random.sample(zip_files, SAMPLE_SIZE)
 
-    print("\n[샘플링된 500개 익스텐션 분석 시작]\n")
+    print("\n[샘플링된 2000개 익스텐션 분석 시작]\n")
 
     # CSV 파일 저장
     with open(output_csv, "w", newline="") as csvfile:
@@ -78,6 +78,6 @@ def analyze_sampled_extensions(input_folder, output_csv):
 # 실행
 if __name__ == "__main__":
     INPUT_FOLDER = "/home/minhyuk/Desktop/Download_extension/Extensions"  # ZIP 파일이 있는 폴더
-    OUTPUT_CSV = "extension_permissions.csv"
+    OUTPUT_CSV = "sampling_permissions.csv"
 
     analyze_sampled_extensions(INPUT_FOLDER, OUTPUT_CSV)
