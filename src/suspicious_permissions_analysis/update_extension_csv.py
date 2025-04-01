@@ -5,8 +5,8 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-INPUT_CSV = "/home/minhyuk/Desktop/extension_permissions.csv"
-OUTPUT_CSV = "/home/minhyuk/Desktop/extension_permissions_analysis.csv"
+INPUT_CSV = "/home/minhyuk/Desktop/ChromeExtension_Analysis/src/suspicious_permissions_analysis/sampling_permissions.csv"
+OUTPUT_CSV = "/home/minhyuk/Desktop/ChromeExtension_Analysis/src/suspicious_permissions_analysis/update_sampling_permissions.csv"
 
 def extract_extension_id(path):
     """경로에서 확장 프로그램 ID를 추출"""
